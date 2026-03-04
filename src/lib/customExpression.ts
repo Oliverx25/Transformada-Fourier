@@ -26,8 +26,12 @@ export function createCustomSignal(
     return (t: number): number => {
       const tWrapped = wrapToPeriod(t, T);
       scope.t = tWrapped;
-      const result = compiled.evaluate(scope);
-      return typeof result === 'number' && Number.isFinite(result) ? result : 0;
+      try {
+        const result = compiled.evaluate(scope);
+        return typeof result === 'number' && Number.isFinite(result) ? result : 0;
+      } catch {
+        return 0;
+      }
     };
   } catch {
     return null;

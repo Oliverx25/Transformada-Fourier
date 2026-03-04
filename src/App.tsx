@@ -1,5 +1,10 @@
-import { useMemo, useState } from 'react';
-import { sampleSignal, computeSpectrum, effectiveSampleRate } from './lib/fft';
+import React, { useMemo, useState } from 'react';
+import {
+  sampleSignal,
+  computeSpectrum,
+  effectiveSampleRate,
+  type SignalFunction,
+} from './lib/fft';
 import { createCustomSignal } from './lib/customExpression';
 import {
   SIGNAL_OPTIONS,
@@ -12,26 +17,36 @@ import { SpectrumChart } from './components/SpectrumChart';
 const T = 1;
 const T_MIN = -2;
 const T_MAX = 2;
-const FFT_SIZE = 2048;
+const FFT_SIZE = 512;
 const DEFAULT_CUSTOM_EXPRESSION = 'sin(2*pi*t)';
 
-function App() {
+type TimePoint = { t: number; value: number };
+type SpectrumPoint = { frequency: number; magnitude: number };
+type ComputationResult = {
+  timeData: TimePoint[];
+  spectrumData: SpectrumPoint[];
+  isValid: boolean;
+  error: string | null;
+};
+
+function App(): React.ReactElement {
   const [signalId, setSignalId] = useState<SignalId>('sine');
   const [customExpression, setCustomExpression] =
     useState(DEFAULT_CUSTOM_EXPRESSION);
 
-  const signalFn = useMemo(() => {
+  const signalFn = useMemo((): SignalFunction | null => {
     if (signalId === 'custom') {
       return createCustomSignal(customExpression, T);
     }
-    return SIGNAL_OPTIONS[signalId].fn;
+    const id = signalId as Exclude<SignalId, 'custom'>;
+    return SIGNAL_OPTIONS[id].fn;
   }, [signalId, customExpression]);
 
-  const { timeData, spectrumData, isValid, error } = useMemo(() => {
+  const { timeData, spectrumData, isValid, error } = useMemo((): ComputationResult => {
     if (!signalFn) {
       return {
-        timeData: [] as { t: number; value: number }[],
-        spectrumData: [] as { frequency: number; magnitude: number }[],
+        timeData: [],
+        spectrumData: [],
         isValid: false,
         error: 'Expresión inválida. Usa la variable t (ej: sin(2*pi*t))',
       };
@@ -41,7 +56,7 @@ function App() {
     const Fs = effectiveSampleRate(T_MIN, T_MAX, FFT_SIZE);
     const spectrum = computeSpectrum(samples, Fs);
 
-    const timeData: { t: number; value: number }[] = [];
+    const timeData: TimePoint[] = [];
     const step = (T_MAX - T_MIN) / (FFT_SIZE - 1);
     for (let i = 0; i < FFT_SIZE; i++) {
       const t = T_MIN + i * step;
@@ -86,7 +101,9 @@ function App() {
                 <select
                   id="signal"
                   value={signalId}
-                  onChange={(e) => setSignalId(e.target.value as SignalId)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                    setSignalId(e.target.value as SignalId)
+                  }
                   className="rounded-lg border border-zinc-700 bg-zinc-800/80 px-4 py-2.5 font-display text-sm text-zinc-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 >
                   {(Object.entries(SIGNAL_OPTIONS) as [SignalId, { label: string }][]).map(
@@ -111,7 +128,9 @@ function App() {
                     id="customExpr"
                     type="text"
                     value={customExpression}
-                    onChange={(e) => setCustomExpression(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setCustomExpression(e.target.value)
+                    }
                     placeholder="sin(2*pi*t)"
                     className={`w-full rounded-lg border px-4 py-2.5 font-mono text-sm focus:outline-none focus:ring-1 ${
                       isValid
@@ -129,7 +148,7 @@ function App() {
               )}
             </div>
             <p className="mt-4 text-xs text-zinc-500">
-              Ventana: [{T_MIN}, {T_MAX}] s · {FFT_SIZE} muestras (FFT)
+              Ventana: [{T_MIN}, {T_MAX}] s · {FFT_SIZE} muestras (DFT directa)
             </p>
           </section>
 
