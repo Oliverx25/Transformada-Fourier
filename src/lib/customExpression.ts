@@ -1,6 +1,7 @@
 /**
  * Parser de expresiones matemáticas para la Transformada de Fourier
- * Variable: t. Período T para extensión periódica.
+ * Variable: t (tiempo real). Se evalúa f(t) en cada t sin extensión periódica,
+ * para que la gráfica en tiempo y el espectro correspondan a la ventana [tMin, tMax].
  */
 
 import { create, all } from 'mathjs';
@@ -8,13 +9,9 @@ import type { SignalFunction } from './fourier';
 
 const math = create(all);
 
-function wrapToPeriod(t: number, T: number): number {
-  return t - T * Math.floor((t + T / 2) / T);
-}
-
 export function createCustomSignal(
   expression: string,
-  T: number
+  _T: number
 ): SignalFunction | null {
   const trimmed = expression.trim();
   if (!trimmed) return null;
@@ -24,8 +21,7 @@ export function createCustomSignal(
     const scope: { t: number } = { t: 0 };
 
     return (t: number): number => {
-      const tWrapped = wrapToPeriod(t, T);
-      scope.t = tWrapped;
+      scope.t = t;
       try {
         const result = compiled.evaluate(scope);
         return typeof result === 'number' && Number.isFinite(result) ? result : 0;
