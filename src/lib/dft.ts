@@ -51,7 +51,7 @@ function dftDirect(x: number[]): Complex[] {
 }
 
 /**
- * Calcula el espectro de magnitud mediante DFT directa (sin FFT).
+ * Calcula el espectro de magnitud mediante DFT directa.
  * Devuelve frecuencias positivas 0 a Fs/2.
  *
  * @param samples - Muestras en tiempo (cualquier longitud N)

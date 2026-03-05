@@ -1,11 +1,12 @@
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 
 interface SpectrumPoint {
@@ -21,7 +22,7 @@ export function SpectrumChart({ data }: SpectrumChartProps) {
   return (
     <div className="h-[320px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart
+        <LineChart
           data={data}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
@@ -58,14 +59,18 @@ export function SpectrumChart({ data }: SpectrumChartProps) {
             formatter={(value: number) => [value.toFixed(4), 'Magnitud']}
             labelFormatter={(f) => `f = ${Number(f).toFixed(3)} Hz`}
           />
-          <Bar
+          <ReferenceLine x={0} stroke="#71717a" strokeDasharray="3 3" />
+          <ReferenceLine y={0} stroke="#52525b" strokeDasharray="2 2" />
+          <Line
+            type="monotone"
             dataKey="magnitude"
             name="Espectro"
-            fill="#f472b6"
-            fillOpacity={0.85}
-            radius={[2, 2, 0, 0]}
+            stroke="#f472b6"
+            strokeWidth={2}
+            dot={false}
+            connectNulls
           />
-        </BarChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
   );

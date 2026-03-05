@@ -4,7 +4,7 @@ import {
   computeSpectrum,
   effectiveSampleRate,
   type SignalFunction,
-} from './lib/fft';
+} from './lib/dft';
 import { createCustomSignal } from './lib/customExpression';
 import {
   SIGNAL_OPTIONS,
@@ -17,7 +17,7 @@ import { SpectrumChart } from './components/SpectrumChart';
 const T = 1;
 const T_MIN = -2;
 const T_MAX = 2;
-const FFT_SIZE = 512;
+const DFT_SIZE = 512;
 const DEFAULT_CUSTOM_EXPRESSION = 'sin(2*pi*t)';
 
 type TimePoint = { t: number; value: number };
@@ -28,6 +28,19 @@ type ComputationResult = {
   isValid: boolean;
   error: string | null;
 };
+
+/** Refleja el espectro unilateral (0 a Fs/2) al plano negativo para fines didácticos. */
+function toTwoSidedSpectrum(oneSided: SpectrumPoint[]): SpectrumPoint[] {
+  const result: SpectrumPoint[] = [];
+  for (const p of oneSided) {
+    result.push({ frequency: p.frequency, magnitude: p.magnitude });
+    if (p.frequency > 0) {
+      result.push({ frequency: -p.frequency, magnitude: p.magnitude });
+    }
+  }
+  result.sort((a, b) => a.frequency - b.frequency);
+  return result;
+}
 
 function App(): React.ReactElement {
   const [signalId, setSignalId] = useState<SignalId>('sine');
@@ -52,20 +65,21 @@ function App(): React.ReactElement {
       };
     }
 
-    const samples = sampleSignal(signalFn, T_MIN, T_MAX, FFT_SIZE);
-    const Fs = effectiveSampleRate(T_MIN, T_MAX, FFT_SIZE);
-    const spectrum = computeSpectrum(samples, Fs);
+    const samples = sampleSignal(signalFn, T_MIN, T_MAX, DFT_SIZE);
+    const Fs = effectiveSampleRate(T_MIN, T_MAX, DFT_SIZE);
+    const spectrumOneSided = computeSpectrum(samples, Fs);
+    const spectrumData = toTwoSidedSpectrum(spectrumOneSided);
 
     const timeData: TimePoint[] = [];
-    const step = (T_MAX - T_MIN) / (FFT_SIZE - 1);
-    for (let i = 0; i < FFT_SIZE; i++) {
+    const step = (T_MAX - T_MIN) / (DFT_SIZE - 1);
+    for (let i = 0; i < DFT_SIZE; i++) {
       const t = T_MIN + i * step;
       timeData.push({ t, value: samples[i] });
     }
 
     return {
       timeData,
-      spectrumData: spectrum,
+      spectrumData,
       isValid: true,
       error: null,
     };
@@ -148,7 +162,7 @@ function App(): React.ReactElement {
               )}
             </div>
             <p className="mt-4 text-xs text-zinc-500">
-              Ventana: [{T_MIN}, {T_MAX}] s · {FFT_SIZE} muestras (DFT directa)
+              Ventana: [{T_MIN}, {T_MAX}] s · {DFT_SIZE} muestras (DFT directa)
             </p>
           </section>
 
@@ -173,7 +187,7 @@ function App(): React.ReactElement {
               Espectro de frecuencia
             </h2>
             <p className="mb-4 text-sm text-zinc-400">
-              Magnitud |X(f)| vs frecuencia f (Hz)
+              Magnitud |X(f)| vs frecuencia f (Hz). Centro en f = 0 (espectro reflejado en frecuencias negativas).
             </p>
             {spectrumData.length > 0 ? (
               <SpectrumChart data={spectrumData} />

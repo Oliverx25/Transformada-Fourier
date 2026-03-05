@@ -12,7 +12,7 @@ Aplicación web que calcula y muestra la **Transformada de Fourier** de una señ
 ## Uso
 
 - Elige una señal o escribe una expresión (ej: `sin(2*pi*t)`, `cos(4*pi*t)`).
-- La ventana de análisis es [-2, 2] s con 2048 muestras (FFT).
+- La ventana de análisis es [-2, 2] s con 512 muestras (DFT directa).
 - El espectro muestra las frecuencias positivas hasta la frecuencia de Nyquist.
 
 ## Desarrollo
@@ -31,4 +31,4 @@ Conecta el repositorio en [Vercel](https://vercel.com) o usa `npx vercel`.
 - Vite + React + TypeScript
 - Recharts
 - Tailwind CSS
-- FFT radix-2 implementada en el proyecto
+- DFT (método directo) implementada en el proyecto
