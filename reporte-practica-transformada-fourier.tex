@@ -1,0 +1,171 @@
+% Reporte de práctica: Transformada de Fourier (espectro vía DFT)
+% Procesamiento Digital de Señales (PDS)
+
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+\title{\textbf{Reporte de práctica: Transformada de Fourier y espectro de frecuencia}\\[0.5em]
+\large Procesamiento Digital de Señales}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Se desarrolló una aplicación web interactiva para visualizar el \textbf{espectro de frecuencia} de una señal en tiempo continuo. La señal se muestrea en una ventana finita, se calcula la \textbf{transformada de Fourier discreta (DFT)} por el método directo y se muestra la magnitud \(|X(f)|\) frente a la frecuencia \(f\) en Hz. El reporte describe el marco teórico (muestreo, definición de la DFT, relación índice--frecuencia, espectro de magnitud), la metodología de implementación (muestreo equiespaciado, DFT directa \(O(N^2)\), espectro unilateral y reflejo bilateral para visualización) y la estructura del software. La herramienta permite elegir una señal predefinida o una expresión personalizada y comparar la forma de onda en el tiempo con su contenido frecuencial.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%==============================================================================
+\section{Introducción}
+%==============================================================================
+
+La \textbf{transformada de Fourier} permite representar una señal en el \textbf{dominio de la frecuencia}, identificando qué componentes sinusoidales (frecuencias) la componen. En Procesamiento Digital de Señales (PDS), al trabajar con secuencias discretas se utiliza la \textbf{transformada de Fourier discreta (DFT)}, que toma \(N\) muestras en el tiempo y produce \(N\) coeficientes complejos asociados a frecuencias equiespaciadas. El módulo de cada coeficiente (magnitud) indica cuánto contribuye esa frecuencia a la señal.
+
+El objetivo de esta práctica fue implementar el cálculo del espectro de una señal continua mediante:
+\begin{itemize}[noitemsep]
+  \item \textbf{Muestreo} de la señal \(f(t)\) en una ventana temporal \([t_{\min}, t_{\max}]\) con \(N\) puntos equiespaciados.
+  \item \textbf{DFT directa} de la secuencia de muestras (método explícito, sin FFT) para obtener los coeficientes \(X[k]\).
+  \item \textbf{Espectro de magnitud}: cálculo de \(|X[k]|\) y mapeo del índice \(k\) a frecuencia en Hz; visualización unilateral (0 a \(F_s/2\)) y reflejo a frecuencias negativas para un espectro bilateral didáctico.
+  \item \textbf{Interfaz}: gráfica de la señal en el tiempo y gráfica del espectro \(|X(f)|\) vs \(f\) (Hz).
+\end{itemize}
+
+El desarrollo se realizó en TypeScript/React con DFT implementada explícitamente (doble bucle) y librerías de gráficas (Recharts) y evaluación de expresiones (mathjs).
+
+%==============================================================================
+\section{Marco teórico}
+%==============================================================================
+
+\subsection{Muestreo de una señal continua}
+
+Dada una señal continua \(f(t)\), se considera una \textbf{ventana finita} \([t_{\min}, t_{\max}]\) y \(N\) instantes equiespaciados:
+\begin{equation}
+  t_n = t_{\min} + n\,\frac{t_{\max} - t_{\min}}{N-1}, \qquad n = 0, 1, \ldots, N-1.
+\end{equation}
+La secuencia discreta es \(x[n] = f(t_n)\). La \textbf{frecuencia de muestreo efectiva} se define como
+\begin{equation}
+  F_s = \frac{N-1}{t_{\max} - t_{\min}} \quad \text{(muestras por segundo)}.
+\end{equation}
+Así, el espaciado temporal entre muestras es \(\Delta t = (t_{\max}-t_{\min})/(N-1) = 1/F_s\).
+
+\subsection{Transformada de Fourier discreta (DFT)}
+
+La DFT de una secuencia \(x[n]\) de longitud \(N\) es
+\begin{equation}
+  X[k] = \sum_{n=0}^{N-1} x[n]\, e^{-j2\pi kn/N}, \qquad k = 0, 1, \ldots, N-1.
+  \label{eq:dft}
+\end{equation}
+Cada \(X[k]\) es un número complejo. Usando \(e^{-j\theta} = \cos\theta - j\sin\theta\):
+\begin{equation}
+  X[k] = \sum_{n=0}^{N-1} x[n]\cos\frac{2\pi kn}{N} - j\sum_{n=0}^{N-1} x[n]\sin\frac{2\pi kn}{N}.
+\end{equation}
+La \textbf{magnitud} es \(|X[k]| = \sqrt{\mathrm{Re}(X[k])^2 + \mathrm{Im}(X[k])^2}\).
+
+\subsection{Relación índice--frecuencia}
+
+Para una DFT de \(N\) puntos y frecuencia de muestreo \(F_s\), la frecuencia en Hz correspondiente al índice \(k\) es
+\begin{equation}
+  f_k = \frac{k\,F_s}{N}.
+\end{equation}
+Los índices \(k = 0, \ldots, \lfloor N/2 \rfloor\) cubren el rango de frecuencias desde 0 hasta \(F_s/2\) (límite de Nyquist). La DFT es periódica en \(k\) con periodo \(N\); los índices \(k > N/2\) corresponden a frecuencias ``negativas'' en el sentido \(f_k - F_s\).
+
+\subsection{Espectro de magnitud}
+
+El \textbf{espectro unilateral} (solo frecuencias no negativas) se forma con los puntos \((f_k, |X[k]|)\) para \(k = 0, \ldots, \lfloor N/2 \rfloor\). Es habitual escalar la magnitud por \(2/N\) (salvo \(k=0\) para la componente de continua) para que la amplitud de una sinusoide pura se refleje correctamente en la altura del pico. En esta práctica se usa \((2/N)|X[k]|\) para todos los \(k\) del lado positivo. Para una visualización didáctica centrada en \(f=0\), el espectro unilateral se \textbf{refleja} a frecuencias negativas, obteniendo un espectro \textbf{bilateral} simétrico en magnitud para señales reales.
+
+\subsection{Conexión con PDS}
+
+\begin{itemize}
+  \item \textbf{Muestreo}: conversión tiempo continuo $\to$ tiempo discreto; teorema de muestreo de Nyquist-Shannon; aliasing si \(F_s\) es insuficiente.
+  \item \textbf{DFT}: muestreo en frecuencia de la transformada de Fourier de la secuencia; resolución frecuencial \(\Delta f = F_s/N\); uso de ventanas para reducir derrame espectral.
+  \item \textbf{FFT}: algoritmo rápido para calcular la DFT en \(O(N\log N)\); base del análisis espectral en laboratorio y tiempo real.
+\end{itemize}
+
+%==============================================================================
+\section{Metodología y desarrollo}
+%==============================================================================
+
+\subsection{Muestreo}
+
+La función \texttt{sampleSignal(f, tMin, tMax, N)} evalúa la señal \(f(t)\) en \(N\) instantes \(t_n\) equiespaciados en \([t_{\min}, t_{\max}]\) y devuelve el array \(x[0], \ldots, x[N-1]\). En la aplicación se fija \(t_{\min} = -2\), \(t_{\max} = 2\) y \(N = 512\) (\texttt{DFT\_SIZE}).
+
+\subsection{DFT directa}
+
+La DFT se implementa con dos bucles anidados: para cada \(k = 0, \ldots, N-1\) se calcula la suma \eqref{eq:dft} sobre \(n\), evaluando \(\cos(2\pi kn/N)\) y \(\sin(2\pi kn/N)\) y acumulando la parte real e imaginaria por separado. La complejidad es \(O(N^2)\). No se utiliza el algoritmo FFT para mantener la implementación explícita y didáctica.
+
+\subsection{Cálculo del espectro}
+
+A partir de las muestras y de la frecuencia de muestreo efectiva \(F_s = (N-1)/(t_{\max}-t_{\min})\), se obtienen los coeficientes \(X[k]\) con la DFT directa. Para \(k = 0, \ldots, \lfloor N/2 \rfloor\) se calcula la magnitud \((2/N)|X[k]|\) y la frecuencia \(f_k = k F_s/N\), generando el espectro unilateral. Para la gráfica se construye el espectro bilateral duplicando cada punto \((f_k, \text{magnitud})\) en \((-f_k, \text{magnitud})\) (salvo \(f_k=0\)) y ordenando por frecuencia, de modo que la curva quede centrada en \(f=0\).
+
+\subsection{Señales}
+
+Las señales predefinidas (onda cuadrada, diente de sierra, triangular, sinusoidal, pulso rectangular) tienen periodo \(T=1\) y se extienden periódicamente. La expresión personalizada se evalúa con mathjs en la variable \(t\); la ventana de análisis es \([t_{\min}, t_{\max}]\), por lo que el espectro corresponde a la restricción de la señal a ese intervalo (truncamiento o enventanado rectangular).
+
+%==============================================================================
+\section{Implementación del software}
+%==============================================================================
+
+\subsection{Herramientas utilizadas}
+
+\begin{itemize}
+  \item \textbf{Vite + React + TypeScript}: entorno de desarrollo.
+  \item \textbf{Recharts}: gráfica de la señal en el tiempo (\texttt{TimeChart}) y del espectro de magnitud (\texttt{SpectrumChart}).
+  \item \textbf{Tailwind CSS}: estilos.
+  \item \textbf{mathjs}: evaluación de expresiones para señales personalizadas.
+\end{itemize}
+
+\subsection{Estructura del proyecto}
+
+\begin{verbatim}
+src/
+  App.tsx                 # Estado, muestreo, DFT, espectro bilateral, layout
+  lib/
+    dft.ts                # sampleSignal, dftDirect, computeSpectrum, effectiveSampleRate
+    fourier.ts            # Re-export SignalFunction
+    signals.ts            # Señales predefinidas
+    customExpression.ts   # createCustomSignal (mathjs)
+  components/
+    TimeChart.tsx         # Gráfica señal en el tiempo
+    SpectrumChart.tsx     # Gráfica |X(f)| vs f (Hz)
+\end{verbatim}
+
+\subsection{Interfaz de usuario}
+
+\begin{enumerate}
+  \item \textbf{Sección ``Parámetros''}: selector de señal (preset o expresión personalizada); texto informativo con la ventana temporal y el número de muestras.
+  \item \textbf{Sección ``Señal en el tiempo''}: gráfica de la señal muestreada en el intervalo de análisis.
+  \item \textbf{Sección ``Espectro de frecuencia''}: gráfica de la magnitud \(|X(f)|\) frente a la frecuencia \(f\) (Hz) en formato bilateral centrado en \(f=0\).
+\end{enumerate}
+
+%==============================================================================
+\section{Resultados y conclusiones}
+%==============================================================================
+
+Se obtuvo una aplicación web funcional que muestrea una señal continua en una ventana fija, calcula su DFT por el método directo y visualiza el espectro de magnitud en frecuencia. El usuario puede elegir distintas señales (incluida una expresión personalizada) y observar la relación entre la forma de onda en el tiempo y los picos espectrales (por ejemplo, una sinusoide a 1\,Hz produce picos en \(\pm 1\)\,Hz en el espectro bilateral).
+
+La práctica refuerza los conceptos de PDS sobre muestreo, DFT, relación índice--frecuencia, espectro de magnitud y limitaciones de la ventana finita (truncamiento). La implementación explícita de la DFT (\(O(N^2)\)) sirve como base para comprender el algoritmo FFT y su uso en el análisis espectral.
+
+%==============================================================================
+\section*{Referencias}
+%==============================================================================
+
+\begin{enumerate}
+  \item Oppenheim, A. V., Willsky, A. S., \& Nawab, S. H. \emph{Señales y sistemas} (2ª ed.). Pearson.
+  \item Proyecto \texttt{Transformada-Fourier}: \url{https://github.com/Oliverx25/Transformada-Fourier.git} (repositorio del código y README).
+  \item mathjs -- Expresiones matemáticas: \url{https://mathjs.org/}.
+\end{enumerate}
+
+\end{document}
