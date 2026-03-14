@@ -51,13 +51,24 @@ function dftDirect(x: number[]): Complex[] {
 }
 
 /**
- * Calcula el espectro de magnitud mediante DFT directa.
- * Devuelve frecuencias positivas 0 a Fs/2.
+ * Convierte índice de bin k en frecuencia en Hz (espectro dos lados).
+ * k = 0..N/2 -> f = 0..Fs/2; k = N/2+1..N-1 -> f = -Fs/2+Δf..-Δf
+ */
+function binToFrequencyTwoSided(k: number, N: number, Fs: number): number {
+  if (k <= N / 2) return (k * Fs) / N;
+  return ((k - N) * Fs) / N;
+}
+
+/**
+ * Espectro de magnitud de la DFT como función en el dominio de la frecuencia.
+ * Dos lados: f desde -Fs/2 hasta Fs/2, ordenado por f.
+ * Escalado: |X[k]|/N (convención dos lados para señal real).
+ * No usa FFT; usa DFT directa O(N²).
  *
  * @param samples - Muestras en tiempo (cualquier longitud N)
  * @param sampleRate - Frecuencia de muestreo Fs (muestras/segundo)
  */
-export function computeSpectrum(
+export function computeDFTSpectrumTwoSided(
   samples: number[],
   sampleRate: number
 ): { frequency: number; magnitude: number }[] {
@@ -68,15 +79,15 @@ export function computeSpectrum(
   const Fs = sampleRate;
   const result: { frequency: number; magnitude: number }[] = [];
 
-  const half = Math.floor(N / 2);
-  for (let k = 0; k <= half; k++) {
+  for (let k = 0; k < N; k++) {
     const re = X[k][0];
     const im = X[k][1];
-    const magnitude = (2 / N) * Math.sqrt(re * re + im * im);
-    const frequency = (k * Fs) / N;
+    const magnitude = Math.sqrt(re * re + im * im) / N;
+    const frequency = binToFrequencyTwoSided(k, N, Fs);
     result.push({ frequency, magnitude });
   }
 
+  result.sort((a, b) => a.frequency - b.frequency);
   return result;
 }
 

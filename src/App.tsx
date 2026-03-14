@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   sampleSignal,
-  computeSpectrum,
+  computeDFTSpectrumTwoSided,
   effectiveSampleRate,
   type SignalFunction,
 } from './lib/dft';
@@ -29,19 +29,6 @@ type ComputationResult = {
   error: string | null;
 };
 
-/** Refleja el espectro unilateral (0 a Fs/2) al plano negativo para fines didácticos. */
-function toTwoSidedSpectrum(oneSided: SpectrumPoint[]): SpectrumPoint[] {
-  const result: SpectrumPoint[] = [];
-  for (const p of oneSided) {
-    result.push({ frequency: p.frequency, magnitude: p.magnitude });
-    if (p.frequency > 0) {
-      result.push({ frequency: -p.frequency, magnitude: p.magnitude });
-    }
-  }
-  result.sort((a, b) => a.frequency - b.frequency);
-  return result;
-}
-
 function App(): React.ReactElement {
   const [signalId, setSignalId] = useState<SignalId>('sine');
   const [customExpression, setCustomExpression] =
@@ -67,8 +54,7 @@ function App(): React.ReactElement {
 
     const samples = sampleSignal(signalFn, T_MIN, T_MAX, DFT_SIZE);
     const Fs = effectiveSampleRate(T_MIN, T_MAX, DFT_SIZE);
-    const spectrumOneSided = computeSpectrum(samples, Fs);
-    const spectrumData = toTwoSidedSpectrum(spectrumOneSided);
+    const spectrumData = computeDFTSpectrumTwoSided(samples, Fs);
 
     const timeData: TimePoint[] = [];
     const step = (T_MAX - T_MIN) / (DFT_SIZE - 1);
@@ -175,7 +161,7 @@ function App(): React.ReactElement {
               )}
             </div>
             <p className="mt-4 text-xs text-zinc-500">
-              Ventana: [{T_MIN}, {T_MAX}] s · {DFT_SIZE} muestras (DFT directa)
+              Ventana: [{T_MIN}, {T_MAX}] s · {DFT_SIZE} muestras · DFT directa (sin FFT)
             </p>
           </section>
 
@@ -200,7 +186,7 @@ function App(): React.ReactElement {
               Espectro de frecuencia
             </h2>
             <p className="mb-4 text-sm text-zinc-400">
-              Magnitud |X(f)| vs frecuencia f (Hz). Centro en f = 0 (espectro reflejado en frecuencias negativas).
+              Espectro de la DFT: magnitud |X(f)| como función de la frecuencia f (Hz), dominio −Fs/2 a Fs/2.
             </p>
             {spectrumData.length > 0 ? (
               <SpectrumChart data={spectrumData} />
