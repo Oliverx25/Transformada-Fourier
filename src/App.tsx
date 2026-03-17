@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import {
   sampleSignal,
-  computeDFTSpectrumTwoSided,
-  effectiveSampleRate,
   type SignalFunction,
 } from './lib/dft';
+import { computeCTFTLineSpectrum, type FourierLine } from './lib/ctft';
 import { createCustomSignal } from './lib/customExpression';
 import {
   SIGNAL_OPTIONS,
@@ -17,17 +16,84 @@ import { SpectrumChart } from './components/SpectrumChart';
 const T = 1;
 const T_MIN = -2;
 const T_MAX = 2;
-const DFT_SIZE = 512;
+const TIME_SAMPLES = 512;
+const MAX_HARMONIC = 25;
 const DEFAULT_CUSTOM_EXPRESSION = 'sin(2*pi*t)';
 
 type TimePoint = { t: number; value: number };
-type SpectrumPoint = { frequency: number; magnitude: number };
+type SpectrumPoint = {
+  omega: number;
+  magnitude: number;
+  k: number;
+  akRe: number;
+  akIm: number;
+};
 type ComputationResult = {
   timeData: TimePoint[];
   spectrumData: SpectrumPoint[];
+  lines: FourierLine[];
+  mathText: string;
   isValid: boolean;
   error: string | null;
 };
+
+function formatMathBlock(title: string, lines: string[]): string {
+  return [title, ...lines].join('\n');
+}
+
+function buildMathText(params: {
+  signalId: SignalId;
+  label: string;
+  customExpression: string;
+  T: number;
+  lines: FourierLine[];
+}): string {
+  const { signalId, label, customExpression, T, lines } = params;
+  const omega0 = (2 * Math.PI) / T;
+  const header = `Señal seleccionada: ${label}`;
+
+  const general = formatMathBlock('Definiciones (señal periódica):', [
+    `ω₀ = 2π/T = ${omega0.toFixed(6)} rad/s`,
+    'aₖ = (1/T) ∫_{-T/2}^{T/2} x(t) e^{-jkω₀t} dt',
+    'X(ω) = 2π Σ aₖ δ(ω − kω₀)',
+    'Visualización: graficamos |2π·aₖ| como “líneas” en ω = kω₀',
+  ]);
+
+  const signalFormula =
+    signalId === 'custom'
+      ? formatMathBlock('x(t):', [`x(t) = ${customExpression}`])
+      : (() => {
+          switch (signalId) {
+            case 'sine':
+              return formatMathBlock('x(t):', ['x(t) = sin(2πt/T)']);
+            case 'square':
+              return formatMathBlock('x(t):', ['x(t) = onda cuadrada ±1 (periódica, T)']);
+            case 'triangle':
+              return formatMathBlock('x(t):', ['x(t) = onda triangular (periódica, T)']);
+            case 'sawtooth':
+              return formatMathBlock('x(t):', ['x(t) = diente de sierra (periódica, T)']);
+            case 'rect':
+              return formatMathBlock('x(t):', [
+                'x(t) = pulso rectangular periódico (según la definición usada en la app)',
+              ]);
+            default:
+              return formatMathBlock('x(t):', ['x(t) = señal periódica']);
+          }
+        })();
+
+  const top = [...lines]
+    .sort((a, b) => b.magnitude - a.magnitude)
+    .slice(0, 8)
+    .map((l) => {
+      const re = l.ak.re;
+      const im = l.ak.im;
+      return `k=${l.k.toString().padStart(3, ' ')}  ω=${l.omega.toFixed(4).padStart(10, ' ')}  aₖ=${re.toFixed(6)} ${im >= 0 ? '+' : '-'} j${Math.abs(im).toFixed(6)}  |2πaₖ|=${l.magnitude.toFixed(6)}`;
+    });
+
+  const numeric = formatMathBlock('Componentes dominantes (numéricas):', top.length ? top : ['(sin datos)']);
+
+  return [header, '', signalFormula, '', general, '', numeric].join('\n');
+}
 
 function App(): React.ReactElement {
   const [signalId, setSignalId] = useState<SignalId>('sine');
@@ -42,34 +108,56 @@ function App(): React.ReactElement {
     return SIGNAL_OPTIONS[id].fn;
   }, [signalId, customExpression]);
 
-  const { timeData, spectrumData, isValid, error } = useMemo((): ComputationResult => {
+  const { timeData, spectrumData, mathText, isValid, error } = useMemo((): ComputationResult => {
     if (!signalFn) {
       return {
         timeData: [],
         spectrumData: [],
+        lines: [],
+        mathText: '',
         isValid: false,
         error: 'Expresión inválida. Usa la variable t (ej: sin(2*pi*t))',
       };
     }
 
-    const samples = sampleSignal(signalFn, T_MIN, T_MAX, DFT_SIZE);
-    const Fs = effectiveSampleRate(T_MIN, T_MAX, DFT_SIZE);
-    const spectrumData = computeDFTSpectrumTwoSided(samples, Fs);
+    const samples = sampleSignal(signalFn, T_MIN, T_MAX, TIME_SAMPLES);
+    const lines = computeCTFTLineSpectrum(signalFn, T, MAX_HARMONIC);
+    const spectrumData: SpectrumPoint[] = lines.map((l) => ({
+      omega: l.omega,
+      magnitude: l.magnitude,
+      k: l.k,
+      akRe: l.ak.re,
+      akIm: l.ak.im,
+    }));
 
     const timeData: TimePoint[] = [];
-    const step = (T_MAX - T_MIN) / (DFT_SIZE - 1);
-    for (let i = 0; i < DFT_SIZE; i++) {
+    const step = (T_MAX - T_MIN) / (TIME_SAMPLES - 1);
+    for (let i = 0; i < TIME_SAMPLES; i++) {
       const t = T_MIN + i * step;
       timeData.push({ t, value: samples[i] });
     }
 
+    const label =
+      signalId === 'custom'
+        ? CUSTOM_LABEL
+        : SIGNAL_OPTIONS[signalId as Exclude<SignalId, 'custom'>].label;
+    const mathText = buildMathText({
+      signalId,
+      label,
+      customExpression,
+      T,
+      lines,
+    });
+
     return {
       timeData,
       spectrumData,
+      lines,
+      mathText,
       isValid: true,
       error: null,
     };
-  }, [signalFn]);
+  }, [signalFn, signalId, customExpression]);
 
   return (
     <div className="min-h-screen bg-[#0f0f12] text-zinc-100">
@@ -161,8 +249,20 @@ function App(): React.ReactElement {
               )}
             </div>
             <p className="mt-4 text-xs text-zinc-500">
-              Ventana: [{T_MIN}, {T_MAX}] s · {DFT_SIZE} muestras · DFT directa (sin FFT)
+              Tiempo: [{T_MIN}, {T_MAX}] s · {TIME_SAMPLES} muestras · Periodo T = {T} s · Armónicos ±{MAX_HARMONIC}
             </p>
+          </section>
+
+          <section className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-6">
+            <h2 className="mb-4 font-display text-lg font-medium text-zinc-200">
+              Resultado matemático (CTFT de señal periódica)
+            </h2>
+            <p className="mb-4 text-sm text-zinc-400">
+              Se muestra la definición y los coeficientes \(a_k\) (calculados por integración numérica) que generan el espectro de líneas en \(\omega\).
+            </p>
+            <pre className="max-h-[340px] overflow-auto rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-4 font-mono text-xs leading-relaxed text-zinc-200">
+              {isValid ? (mathText || 'Sin datos') : (error ?? 'Señal inválida')}
+            </pre>
           </section>
 
           <section className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-6">
@@ -186,7 +286,7 @@ function App(): React.ReactElement {
               Espectro de frecuencia
             </h2>
             <p className="mb-4 text-sm text-zinc-400">
-              Espectro de la DFT: magnitud |X(f)| como función de la frecuencia f (Hz), dominio −Fs/2 a Fs/2.
+              Espectro de líneas de la CTFT para señal periódica: impulsos en ω = kω₀ con peso |2π·aₖ| (se grafican como “stems”).
             </p>
             {spectrumData.length > 0 ? (
               <SpectrumChart data={spectrumData} />
@@ -200,7 +300,7 @@ function App(): React.ReactElement {
       </main>
 
       <footer className="mt-12 border-t border-zinc-800/60 py-6 text-center text-sm text-zinc-500">
-        Transformada de Fourier · Espectro de frecuencia
+        Transformada de Fourier (Tiempo continuo) · Espectro de líneas
       </footer>
     </div>
   );
