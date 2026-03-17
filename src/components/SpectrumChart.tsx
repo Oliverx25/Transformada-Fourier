@@ -12,14 +12,14 @@ import {
 interface SpectrumPoint {
   omega: number;
   re: number;
-  im: number;
 }
 
 interface SpectrumChartProps {
   data: SpectrumPoint[];
+  xDomain?: [number, number];
 }
 
-export function SpectrumChart({ data }: SpectrumChartProps) {
+export function SpectrumChart({ data, xDomain }: SpectrumChartProps) {
   return (
     <div className="h-[320px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -30,6 +30,7 @@ export function SpectrumChart({ data }: SpectrumChartProps) {
             stroke="#71717a"
             tick={{ fill: '#a1a1aa', fontSize: 12 }}
             tickFormatter={(v) => Number(v).toFixed(2)}
+            domain={xDomain}
             label={{
               value: 'ω (rad/s)',
               position: 'insideBottom',
@@ -62,19 +63,9 @@ export function SpectrumChart({ data }: SpectrumChartProps) {
           <Line
             type="monotone"
             dataKey="re"
-            name="Re{X(jω)}"
+            name="X(jω)"
             stroke="#f472b6"
             strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="im"
-            name="Im{X(jω)}"
-            stroke="#60a5fa"
-            strokeWidth={1.5}
-            strokeDasharray="5 4"
             dot={false}
             isAnimationActive={false}
           />
