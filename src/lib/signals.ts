@@ -1,65 +1,73 @@
 /**
  * Señales predefinidas para la Transformada de Fourier
- * f(t) definida para t ∈ [-T/2, T/2], extendida periódicamente
+ * En esta práctica buscamos visualizar la CTFT continua, por lo que se usan
+ * señales aperiodicas o señales "ventaneadas" (soporte finito) para evitar
+ * espectros de líneas (caso periódico ideal).
  */
 
 import type { SignalFunction } from './fourier';
 
-function normalizePhase(t: number, T: number): number {
-  return ((t / T + 0.5) % 1 + 1) % 1;
+function rect(t: number, halfWidth: number): number {
+  return Math.abs(t) <= halfWidth ? 1 : 0;
 }
 
-export const squareWave: SignalFunction = (t) => {
-  const T = 1;
-  const phase = normalizePhase(t, T);
-  return phase < 0.5 ? -1 : 1;
+export const rectangularPulse: SignalFunction = (t) => {
+  const T1 = 0.25; // medio-ancho del pulso
+  return rect(t, T1);
 };
 
-export const sawtoothWave: SignalFunction = (t) => {
-  const T = 1;
-  const phase = normalizePhase(t, T);
-  return 2 * phase - 1;
+export const windowedSine: SignalFunction = (t) => {
+  const T1 = 0.5;
+  const f0 = 1; // Hz (solo para la forma en el tiempo; CTFT se hace en ω)
+  return rect(t, T1) * Math.sin(2 * Math.PI * f0 * t);
 };
 
-export const triangleWave: SignalFunction = (t) => {
-  const T = 1;
-  const phase = normalizePhase(t, T);
-  return 4 * Math.abs(phase - 0.5) - 1;
+export const triangularPulse: SignalFunction = (t) => {
+  const T1 = 0.5;
+  if (Math.abs(t) > T1) return 0;
+  return 1 - Math.abs(t) / T1;
 };
 
-export const sineWave: SignalFunction = (t) => {
-  const T = 1;
-  return Math.sin((2 * Math.PI * t) / T);
-};
-
-export const createRectangularPulse = (dutyCycle: number): SignalFunction => {
-  const d = Math.max(0.01, Math.min(0.99, dutyCycle));
-  return (t) => {
-    const T = 1;
-    const phase = normalizePhase(t, T);
-    return phase < d ? 1 : 0;
-  };
+export const exponentialDecay: SignalFunction = (t) => {
+  // x(t) = e^{-a t} u(t)
+  const a = 2;
+  return t >= 0 ? Math.exp(-a * t) : 0;
 };
 
 export type SignalId =
-  | 'square'
-  | 'sawtooth'
-  | 'triangle'
-  | 'sine'
   | 'rect'
+  | 'tri'
+  | 'exp'
+  | 'winSine'
   | 'custom';
 
 export const SIGNAL_OPTIONS: Record<
   Exclude<SignalId, 'custom'>,
-  { label: string; fn: SignalFunction }
+  { label: string; fn: SignalFunction; timeText: string; ctftText: string }
 > = {
-  square: { label: 'Onda cuadrada', fn: squareWave },
-  sawtooth: { label: 'Diente de sierra', fn: sawtoothWave },
-  triangle: { label: 'Onda triangular', fn: triangleWave },
-  sine: { label: 'Sinusoidal', fn: sineWave },
   rect: {
-    label: 'Pulso rectangular',
-    fn: createRectangularPulse(0.25),
+    label: 'Pulso rectangular (aperiódico)',
+    fn: rectangularPulse,
+    timeText: 'x(t) = 1, |t| ≤ T1; 0, |t| > T1',
+    ctftText: 'X(jω) = ∫_{-T1}^{T1} e^{-jωt} dt = 2·sin(ωT1)/ω',
+  },
+  tri: {
+    label: 'Pulso triangular (aperiódico)',
+    fn: triangularPulse,
+    timeText: 'x(t) = 1 − |t|/T1, |t| ≤ T1; 0 en otro caso',
+    ctftText: 'X(jω) es real y proporcional a sinc² (forma típica)',
+  },
+  exp: {
+    label: 'Exponencial decreciente (u(t))',
+    fn: exponentialDecay,
+    timeText: 'x(t) = e^{-a t} u(t)',
+    ctftText: 'X(jω) = 1 / (a + jω)',
+  },
+  winSine: {
+    label: 'Seno ventaneado (aperiódico)',
+    fn: windowedSine,
+    timeText: 'x(t) = rect(t/Tw)·sin(2πf0 t)',
+    ctftText: 'CTFT continua (bandas laterales tipo sinc alrededor de ±ω0)',
   },
 };
 

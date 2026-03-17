@@ -3,7 +3,7 @@ import {
   sampleSignal,
   type SignalFunction,
 } from './lib/dft';
-import { computeCTFTLineSpectrum, type FourierLine } from './lib/ctft';
+import { computeCtftNumerical, type CtftPoint } from './lib/ctftContinuous';
 import { createCustomSignal } from './lib/customExpression';
 import {
   SIGNAL_OPTIONS,
@@ -13,25 +13,21 @@ import {
 import { TimeChart } from './components/TimeChart';
 import { SpectrumChart } from './components/SpectrumChart';
 
-const T = 1;
 const T_MIN = -2;
 const T_MAX = 2;
 const TIME_SAMPLES = 512;
-const MAX_HARMONIC = 25;
+const OMEGA_SAMPLES = 801;
 const DEFAULT_CUSTOM_EXPRESSION = 'sin(2*pi*t)';
 
 type TimePoint = { t: number; value: number };
 type SpectrumPoint = {
   omega: number;
-  magnitude: number;
-  k: number;
-  akRe: number;
-  akIm: number;
+  re: number;
+  im: number;
 };
 type ComputationResult = {
   timeData: TimePoint[];
   spectrumData: SpectrumPoint[];
-  lines: FourierLine[];
   mathText: string;
   isValid: boolean;
   error: string | null;
@@ -45,54 +41,27 @@ function buildMathText(params: {
   signalId: SignalId;
   label: string;
   customExpression: string;
-  T: number;
-  lines: FourierLine[];
+  timeText?: string;
+  ctftText?: string;
 }): string {
-  const { signalId, label, customExpression, T, lines } = params;
-  const omega0 = (2 * Math.PI) / T;
+  const { signalId, label, customExpression, timeText, ctftText } = params;
   const header = `Señal seleccionada: ${label}`;
 
-  const general = formatMathBlock('Definiciones (señal periódica):', [
-    `ω₀ = 2π/T = ${omega0.toFixed(6)} rad/s`,
-    'aₖ = (1/T) ∫_{-T/2}^{T/2} x(t) e^{-jkω₀t} dt',
-    'X(ω) = 2π Σ aₖ δ(ω − kω₀)',
-    'Visualización: graficamos |2π·aₖ| como “líneas” en ω = kω₀',
+  const general = formatMathBlock('Definición (CTFT):', [
+    'X(jω) = ∫_{-∞}^{∞} x(t) e^{-jωt} dt',
+    `En la app se aproxima en la ventana: ∫_{${T_MIN}}^{${T_MAX}} x(t) e^{-jωt} dt`,
   ]);
 
   const signalFormula =
     signalId === 'custom'
       ? formatMathBlock('x(t):', [`x(t) = ${customExpression}`])
-      : (() => {
-          switch (signalId) {
-            case 'sine':
-              return formatMathBlock('x(t):', ['x(t) = sin(2πt/T)']);
-            case 'square':
-              return formatMathBlock('x(t):', ['x(t) = onda cuadrada ±1 (periódica, T)']);
-            case 'triangle':
-              return formatMathBlock('x(t):', ['x(t) = onda triangular (periódica, T)']);
-            case 'sawtooth':
-              return formatMathBlock('x(t):', ['x(t) = diente de sierra (periódica, T)']);
-            case 'rect':
-              return formatMathBlock('x(t):', [
-                'x(t) = pulso rectangular periódico (según la definición usada en la app)',
-              ]);
-            default:
-              return formatMathBlock('x(t):', ['x(t) = señal periódica']);
-          }
-        })();
+      : formatMathBlock('x(t):', [timeText ?? 'x(t) definida por la opción seleccionada']);
 
-  const top = [...lines]
-    .sort((a, b) => b.magnitude - a.magnitude)
-    .slice(0, 8)
-    .map((l) => {
-      const re = l.ak.re;
-      const im = l.ak.im;
-      return `k=${l.k.toString().padStart(3, ' ')}  ω=${l.omega.toFixed(4).padStart(10, ' ')}  aₖ=${re.toFixed(6)} ${im >= 0 ? '+' : '-'} j${Math.abs(im).toFixed(6)}  |2πaₖ|=${l.magnitude.toFixed(6)}`;
-    });
+  const ctftFormula = formatMathBlock('CTFT esperada (forma):', [
+    ctftText ?? 'X(jω) puede ser compleja; en la gráfica se muestran Re{X} e Im{X}.',
+  ]);
 
-  const numeric = formatMathBlock('Componentes dominantes (numéricas):', top.length ? top : ['(sin datos)']);
-
-  return [header, '', signalFormula, '', general, '', numeric].join('\n');
+  return [header, '', signalFormula, '', general, '', ctftFormula].join('\n');
 }
 
 function App(): React.ReactElement {
@@ -113,7 +82,6 @@ function App(): React.ReactElement {
       return {
         timeData: [],
         spectrumData: [],
-        lines: [],
         mathText: '',
         isValid: false,
         error: 'Expresión inválida. Usa la variable t (ej: sin(2*pi*t))',
@@ -121,13 +89,21 @@ function App(): React.ReactElement {
     }
 
     const samples = sampleSignal(signalFn, T_MIN, T_MAX, TIME_SAMPLES);
-    const lines = computeCTFTLineSpectrum(signalFn, T, MAX_HARMONIC);
-    const spectrumData: SpectrumPoint[] = lines.map((l) => ({
-      omega: l.omega,
-      magnitude: l.magnitude,
-      k: l.k,
-      akRe: l.ak.re,
-      akIm: l.ak.im,
+    const windowLength = T_MAX - T_MIN;
+    const omegaMax = Math.max(8 * Math.PI, (20 * Math.PI) / windowLength * 10); // heurística estable
+    const { points } = computeCtftNumerical(signalFn, {
+      tMin: T_MIN,
+      tMax: T_MAX,
+      timeSamples: TIME_SAMPLES,
+      omegaMin: -omegaMax,
+      omegaMax,
+      omegaSamples: OMEGA_SAMPLES,
+    });
+
+    const spectrumData: SpectrumPoint[] = points.map((p: CtftPoint) => ({
+      omega: p.omega,
+      re: p.re,
+      im: p.im,
     }));
 
     const timeData: TimePoint[] = [];
@@ -137,22 +113,21 @@ function App(): React.ReactElement {
       timeData.push({ t, value: samples[i] });
     }
 
-    const label =
+    const meta =
       signalId === 'custom'
-        ? CUSTOM_LABEL
-        : SIGNAL_OPTIONS[signalId as Exclude<SignalId, 'custom'>].label;
+        ? { label: CUSTOM_LABEL, timeText: `x(t) = ${customExpression}`, ctftText: undefined }
+        : SIGNAL_OPTIONS[signalId as Exclude<SignalId, 'custom'>];
     const mathText = buildMathText({
       signalId,
-      label,
+      label: meta.label,
       customExpression,
-      T,
-      lines,
+      timeText: signalId === 'custom' ? meta.timeText : meta.timeText,
+      ctftText: meta.ctftText,
     });
 
     return {
       timeData,
       spectrumData,
-      lines,
       mathText,
       isValid: true,
       error: null,
@@ -249,16 +224,16 @@ function App(): React.ReactElement {
               )}
             </div>
             <p className="mt-4 text-xs text-zinc-500">
-              Tiempo: [{T_MIN}, {T_MAX}] s · {TIME_SAMPLES} muestras · Periodo T = {T} s · Armónicos ±{MAX_HARMONIC}
+              Tiempo: [{T_MIN}, {T_MAX}] s · {TIME_SAMPLES} muestras · CTFT numérica (trapecio) · ω con {OMEGA_SAMPLES} puntos
             </p>
           </section>
 
           <section className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-6">
             <h2 className="mb-4 font-display text-lg font-medium text-zinc-200">
-              Resultado matemático (CTFT de señal periódica)
+              Resultado matemático (CTFT)
             </h2>
             <p className="mb-4 text-sm text-zinc-400">
-              Se muestra la definición y los coeficientes \(a_k\) (calculados por integración numérica) que generan el espectro de líneas en \(\omega\).
+              Se muestra la definición de la CTFT y la forma esperada de \(X(j\omega)\) para la señal seleccionada.
             </p>
             <pre className="max-h-[340px] overflow-auto rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-4 font-mono text-xs leading-relaxed text-zinc-200">
               {isValid ? (mathText || 'Sin datos') : (error ?? 'Señal inválida')}
@@ -286,7 +261,7 @@ function App(): React.ReactElement {
               Espectro de frecuencia
             </h2>
             <p className="mb-4 text-sm text-zinc-400">
-              Espectro de líneas de la CTFT para señal periódica: impulsos en ω = kω₀ con peso |2π·aₖ| (se grafican como “stems”).
+              CTFT continua: se grafican Re{X(jω)} e Im{X(jω)} como funciones continuas de ω (rad/s), como en el ejemplo del pulso.
             </p>
             {spectrumData.length > 0 ? (
               <SpectrumChart data={spectrumData} />
@@ -300,7 +275,7 @@ function App(): React.ReactElement {
       </main>
 
       <footer className="mt-12 border-t border-zinc-800/60 py-6 text-center text-sm text-zinc-500">
-        Transformada de Fourier (Tiempo continuo) · Espectro de líneas
+        Transformada de Fourier (Tiempo continuo) · CTFT continua
       </footer>
     </div>
   );
