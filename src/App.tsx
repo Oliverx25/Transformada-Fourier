@@ -264,7 +264,7 @@ function App(): React.ReactElement {
               Espectro de frecuencia
             </h2>
             <p className="mb-4 text-sm text-zinc-400">
-              CTFT continua: se grafican Re{X(jω)} e Im{X(jω)} como funciones continuas de ω (rad/s), como en el ejemplo del pulso.
+              CTFT continua: se grafican Re{'{'}X(jω){'}'} e Im{'{'}X(jω){'}'} como funciones continuas de ω (rad/s), como en el ejemplo del pulso.
             </p>
             {spectrumData.length > 0 ? (
               <SpectrumChart data={spectrumData} />
