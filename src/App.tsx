@@ -65,16 +65,17 @@ function buildMathText(params: {
 }
 
 function App(): React.ReactElement {
-  const [signalId, setSignalId] = useState<SignalId>('sine');
+  const [signalId, setSignalId] = useState<SignalId>('rect');
   const [customExpression, setCustomExpression] =
     useState(DEFAULT_CUSTOM_EXPRESSION);
 
   const signalFn = useMemo((): SignalFunction | null => {
     if (signalId === 'custom') {
-      return createCustomSignal(customExpression, T);
+      return createCustomSignal(customExpression, 0);
     }
     const id = signalId as Exclude<SignalId, 'custom'>;
-    return SIGNAL_OPTIONS[id].fn;
+    const selected = SIGNAL_OPTIONS[id];
+    return selected?.fn ?? null;
   }, [signalId, customExpression]);
 
   const { timeData, spectrumData, mathText, isValid, error } = useMemo((): ComputationResult => {
@@ -182,13 +183,15 @@ function App(): React.ReactElement {
                   }
                   className="rounded-lg border border-zinc-700 bg-zinc-800/80 px-4 py-2.5 font-display text-sm text-zinc-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 >
-                  {(Object.entries(SIGNAL_OPTIONS) as [SignalId, { label: string }][]).map(
-                    ([id, { label }]) => (
-                      <option key={id} value={id}>
-                        {label}
-                      </option>
-                    )
-                  )}
+                  {(
+                    Object.entries(SIGNAL_OPTIONS) as Array<
+                      [Exclude<SignalId, 'custom'>, (typeof SIGNAL_OPTIONS)[Exclude<SignalId, 'custom'>]]
+                    >
+                  ).map(([id, meta]) => (
+                    <option key={id} value={id}>
+                      {meta.label}
+                    </option>
+                  ))}
                   <option value="custom">{CUSTOM_LABEL}</option>
                 </select>
               </div>
