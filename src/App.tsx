@@ -246,18 +246,6 @@ function App(): React.ReactElement {
 
           <section className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-6">
             <h2 className="mb-4 font-display text-lg font-medium text-zinc-200">
-              Resultado matemático (CTFT)
-            </h2>
-            <p className="mb-4 text-sm text-zinc-400">
-              Se muestra la definición de la CTFT y la forma esperada de \(X(j\omega)\) para la señal seleccionada.
-            </p>
-            <pre className="max-h-[340px] overflow-auto rounded-lg border border-zinc-800/70 bg-zinc-950/40 p-4 font-mono text-xs leading-relaxed text-zinc-200">
-              {isValid ? (mathText || 'Sin datos') : (error ?? 'Señal inválida')}
-            </pre>
-          </section>
-
-          <section className="rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-6">
-            <h2 className="mb-4 font-display text-lg font-medium text-zinc-200">
               Señal en el tiempo
             </h2>
             {timeData.length > 0 ? (
