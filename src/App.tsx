@@ -280,44 +280,7 @@ function App(): React.ReactElement {
               CTFT continua: se grafica X(jω) (parte real) como función continua de ω (rad/s), como en el ejemplo del pulso.
             </p>
             {spectrumData.length > 0 ? (
-              <>
-                <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
-                  <span className="font-medium text-zinc-300">Zoom en ω:</span>
-                  <input
-                    type="range"
-                    min={omegaMax * 0.05}
-                    max={omegaMax}
-                    step={omegaMax / 200}
-                    value={omegaZoom ?? omegaMax}
-                    onChange={(e) => setOmegaZoom(Number(e.target.value))}
-                    className="h-1 w-40 cursor-pointer appearance-none rounded-full bg-zinc-700 accent-amber-400"
-                  />
-                  <span>
-                    Ventana: [−
-                    {(omegaZoom ?? omegaMax).toFixed(2)}, {(omegaZoom ?? omegaMax).toFixed(2)}] rad/s
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOmegaZoom(omegaMax / 4)}
-                    className="rounded-md border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 hover:border-amber-500 hover:text-amber-300"
-                  >
-                    Centrar cerca de 0
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOmegaZoom(omegaMax)}
-                    className="rounded-md border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-200 hover:border-amber-500 hover:text-amber-300"
-                  >
-                    Ver todo
-                  </button>
-                </div>
-                <SpectrumChart
-                  data={spectrumData}
-                  xDomain={
-                    omegaZoom && omegaZoom > 0 ? ([-omegaZoom, omegaZoom] as [number, number]) : undefined
-                  }
-                />
-              </>
+              <SpectrumChart data={spectrumData} />
             ) : (
               <div className="flex h-[320px] items-center justify-center rounded-lg bg-zinc-800/30 text-zinc-500">
                 El espectro se mostrará cuando la señal sea válida
